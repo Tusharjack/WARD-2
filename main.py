@@ -124,8 +124,17 @@ async def view_pdf(filename: str, page: int, q: str = None):
         # Find and highlight the text
         if q and len(q) >= 2:
             try:
-                # search_for can be slow or fail on some PDFs
+                # 1. Try exact search
                 text_instances = target_page.search_for(q)
+                
+                # 2. If no exact match, try searching for the first few characters 
+                # (Marathi encoding often breaks at the end of words or with matras)
+                if not text_instances and len(q) > 3:
+                    short_q = q[:3]
+                    text_instances = target_page.search_for(short_q)
+                
+                # 3. If still no match, try common variations (optional, but keep it simple)
+                
                 for inst in text_instances:
                     annot = target_page.add_highlight_annot(inst)
                     annot.update()
