@@ -6,6 +6,7 @@
     <title>मतदार शोध - भाजपा प्रणित उंचगाव विकास आघाडी</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
         
@@ -43,13 +44,30 @@
             border-radius: 2px;
         }
 
+        /* PDF.js Canvas Styles */
+        #pdfCanvas {
+            width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+        .pdf-container {
+            overflow-y: auto;
+            background-color: #525659;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+        }
+
         /* Mobile Adjustments */
         @media (max-width: 1024px) {
             .main-content {
                 flex-direction: column;
             }
             .viewer-panel {
-                height: 60vh;
+                height: auto;
+                min-height: 80vh;
             }
         }
     </style>
@@ -158,12 +176,16 @@
                 </button>
             </div>
 
-            <div class="flex-1 relative overflow-hidden">
+            <div class="flex-1 relative overflow-hidden pdf-container">
                 <div id="placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-white/50 p-8 text-center">
                     <i class="fas fa-file-pdf text-6xl mb-4 opacity-20"></i>
                     <p class="text-lg marathi-text">यादीत नाव पाहण्यासाठी डावीकडील निकालावर क्लिक करा</p>
                 </div>
-                <iframe id="pdfViewer" class="hidden w-full h-full border-none"></iframe>
+                <div id="pdfLoading" class="hidden absolute inset-0 flex flex-col items-center justify-center bg-gray-900/50 z-20">
+                    <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-orange-500 border-t-transparent"></div>
+                    <p class="mt-4 text-white font-bold">PDF उघडत आहे...</p>
+                </div>
+                <canvas id="pdfCanvas" class="hidden"></canvas>
             </div>
         </main>
     </div>
@@ -185,13 +207,48 @@
         const resultsDiv = document.getElementById('results');
         const loadingDiv = document.getElementById('loading');
         const noResultsDiv = document.getElementById('noResults');
-        const pdfViewer = document.getElementById('pdfViewer');
+        const pdfCanvas = document.getElementById('pdfCanvas');
+        const pdfLoading = document.getElementById('pdfLoading');
         const placeholder = document.getElementById('placeholder');
         const resultCount = document.getElementById('resultCount');
         const viewerToolbar = document.getElementById('viewerToolbar');
         const viewerPageInfo = document.getElementById('viewerPageInfo');
 
         let activeItem = null;
+        let pdfDoc = null;
+
+        // Initialize PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        async function renderPDFPage(url, pageNum) {
+            pdfLoading.classList.remove('hidden');
+            pdfCanvas.classList.add('hidden');
+            
+            try {
+                const loadingTask = pdfjsLib.getDocument(url);
+                pdfDoc = await loadingTask.promise;
+                const page = await pdfDoc.getPage(pageNum);
+                
+                const viewport = page.getViewport({ scale: window.innerWidth < 768 ? 1.5 : 2.0 });
+                const context = pdfCanvas.getContext('2d');
+                pdfCanvas.height = viewport.height;
+                pdfCanvas.width = viewport.width;
+
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: viewport
+                };
+                
+                await page.render(renderContext).promise;
+                
+                pdfLoading.classList.add('hidden');
+                pdfCanvas.classList.remove('hidden');
+            } catch (error) {
+                console.error('Error rendering PDF:', error);
+                pdfLoading.classList.add('hidden');
+                alert('PDF दाखवताना त्रुटी आली.');
+            }
+        }
 
         function showInterface() {
             landingPage.classList.add('hidden');
@@ -217,9 +274,9 @@
             activeItem = element;
 
             // Update viewer
-            const url = `/view_pdf?filename=${encodeURIComponent(filename)}&page=${page}&q=${encodeURIComponent(query)}#page=${page}&view=FitH`;
-            pdfViewer.src = url;
-            pdfViewer.classList.remove('hidden');
+            const url = `/view_pdf?filename=${encodeURIComponent(filename)}&page=${page}&q=${encodeURIComponent(query)}`;
+            renderPDFPage(url, 1); // We only fetch one highlighted page at a time
+            
             placeholder.classList.add('hidden');
             
             // Show viewer toolbar and update info
