@@ -165,12 +165,22 @@
         <main id="pdfViewerPanel" class="viewer-panel hidden lg:flex flex-1 bg-gray-800 flex flex-col relative min-h-[500px]">
             <!-- Viewer Toolbar -->
             <div id="viewerToolbar" class="p-3 bg-gray-900 text-white flex items-center justify-between border-b border-gray-700 sticky top-0 z-10">
-                <button onclick="showResults()" class="lg:hidden bg-orange-600 hover:bg-orange-700 px-3 py-1.5 rounded flex items-center gap-2 transition-all shadow-lg text-xs font-bold">
-                    <i class="fas fa-list"></i> निकालांकडे जा
-                </button>
+                <div class="flex items-center gap-2">
+                    <button onclick="showResults()" class="lg:hidden bg-orange-600 hover:bg-orange-700 px-3 py-1.5 rounded flex items-center gap-2 transition-all shadow-lg text-xs font-bold">
+                        <i class="fas fa-list"></i> निकालांकडे जा
+                    </button>
+                    <!-- Page Navigation -->
+                    <div class="flex items-center bg-white/10 rounded-lg p-1 gap-1">
+                        <button onclick="changePage(-1)" class="p-1.5 hover:bg-white/10 rounded text-xs" title="मागील पान">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <span id="pageDisplay" class="text-[10px] font-bold px-2 border-x border-white/20">Page --</span>
+                        <button onclick="changePage(1)" class="p-1.5 hover:bg-white/10 rounded text-xs" title="पुढील पान">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
                 
-                <span id="viewerPageInfo" class="text-[9px] md:text-[10px] font-bold uppercase tracking-widest opacity-60">PDF Viewer</span>
-
                 <button onclick="hideInterface()" class="text-[10px] md:text-xs bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded flex items-center gap-2 transition-all">
                     <i class="fas fa-home text-orange-500"></i> होम
                 </button>
@@ -212,22 +222,34 @@
         const placeholder = document.getElementById('placeholder');
         const resultCount = document.getElementById('resultCount');
         const viewerToolbar = document.getElementById('viewerToolbar');
-        const viewerPageInfo = document.getElementById('viewerPageInfo');
+        const pageDisplay = document.getElementById('pageDisplay');
 
         let activeItem = null;
         let pdfDoc = null;
+        let currentFilename = null;
+        let currentPageNum = 1;
+        let currentSearchQuery = "";
 
         // Initialize PDF.js
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-        async function renderPDFPage(url, pageNum) {
+        async function renderPDFPage(filename, pageNum, query) {
             pdfLoading.classList.remove('hidden');
             pdfCanvas.classList.add('hidden');
             
+            currentFilename = filename;
+            currentPageNum = pageNum;
+            currentSearchQuery = query;
+            pageDisplay.innerText = `Page ${pageNum}`;
+
             try {
+                // Fetch the highlighted page from backend
+                const url = `/view_pdf?filename=${encodeURIComponent(filename)}&page=${pageNum}&q=${encodeURIComponent(query)}`;
                 const loadingTask = pdfjsLib.getDocument(url);
                 pdfDoc = await loadingTask.promise;
-                const page = await pdfDoc.getPage(pageNum);
+                
+                // Since our backend returns a single-page PDF, we always render its page 1
+                const page = await pdfDoc.getPage(1);
                 
                 const viewport = page.getViewport({ scale: window.innerWidth < 768 ? 1.5 : 2.0 });
                 const context = pdfCanvas.getContext('2d');
@@ -248,6 +270,12 @@
                 pdfLoading.classList.add('hidden');
                 alert('PDF दाखवताना त्रुटी आली.');
             }
+        }
+
+        async function changePage(offset) {
+            const nextP = currentPageNum + offset;
+            if (nextP < 1) return; // Backend handles max page check
+            await renderPDFPage(currentFilename, nextP, currentSearchQuery);
         }
 
         function showInterface() {
@@ -274,14 +302,12 @@
             activeItem = element;
 
             // Update viewer
-            const url = `/view_pdf?filename=${encodeURIComponent(filename)}&page=${page}&q=${encodeURIComponent(query)}`;
-            renderPDFPage(url, 1); // We only fetch one highlighted page at a time
+            renderPDFPage(filename, page, query);
             
             placeholder.classList.add('hidden');
             
-            // Show viewer toolbar and update info
+            // Show viewer toolbar
             viewerToolbar.classList.remove('hidden');
-            viewerPageInfo.innerText = `Page ${page} - ${filename}`;
 
             // On mobile, switch view directly to PDF
             if (window.innerWidth < 1024) {
