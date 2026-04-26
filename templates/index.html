@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Reader - Search</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body {
+            background-color: #f3f4f6;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .toolbar {
+            background-color: #ffffff;
+            border-bottom: 1px solid #e5e7eb;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            z-index: 10;
+        }
+        .main-container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+        .search-sidebar {
+            width: 320px;
+            background: white;
+            border-right: 1px solid #e5e7eb;
+            display: flex;
+            flex-direction: column;
+        }
+        .pdf-viewer-container {
+            flex: 1;
+            background: #525659;
+            position: relative;
+        }
+        .result-card {
+            padding: 12px 16px;
+            border-bottom: 1px solid #f3f4f6;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .result-card:hover {
+            background-color: #f9fafb;
+        }
+        .result-card.active {
+            background-color: #eff6ff;
+            border-left: 4px solid #3b82f6;
+        }
+        .highlight {
+            background-color: #fef08a;
+            font-weight: 600;
+            color: #1e40af;
+        }
+        .marathi-text {
+            font-family: 'Arial Unicode MS', 'Sakal Marathi', sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <!-- Simple Header Toolbar -->
+    <header class="toolbar justify-between">
+        <div class="flex items-center gap-4">
+            <i class="fas fa-file-pdf text-red-600 text-2xl"></i>
+            <div>
+                <h1 class="text-sm font-bold text-gray-800">PDF Document Reader</h1>
+                <p class="text-[10px] text-gray-500 uppercase">{{ ", ".join(pdf_names) }}</p>
+            </div>
+        </div>
+        
+        <div class="flex-1 max-w-xl px-8">
+            <div class="relative">
+                <input type="text" id="searchInput" 
+                    class="w-full bg-gray-100 border border-gray-300 rounded-md py-1.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                    placeholder="Search in document...">
+                <i class="fas fa-search absolute left-3 top-2.5 text-gray-400 text-sm"></i>
+            </div>
+        </div>
+
+        <div class="text-xs text-gray-500 font-medium">
+            <span class="bg-gray-100 px-2 py-1 rounded">{{ pdf_count }} Documents Connected</span>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- Results Sidebar -->
+        <aside class="search-sidebar">
+            <div class="p-3 border-bottom bg-gray-50 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                Search Results
+            </div>
+            
+            <div id="loading" class="hidden p-8 text-center">
+                <div class="inline-block animate-spin rounded-full h-5 w-5 border-2 border-blue-500 border-t-transparent"></div>
+            </div>
+
+            <div id="results" class="flex-1 overflow-y-auto">
+                <div class="p-8 text-center text-gray-400 text-sm italic">
+                    Enter a keyword above to start searching
+                </div>
+            </div>
+
+            <div id="noResults" class="hidden p-8 text-center text-gray-500 text-sm">
+                No matches found in the document.
+            </div>
+        </aside>
+
+        <!-- PDF Viewer -->
+        <main class="pdf-viewer-container">
+            <div id="placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
+                <i class="far fa-file-pdf text-8xl mb-4 opacity-10"></i>
+                <p class="text-lg font-medium opacity-30">Select a search result to view</p>
+            </div>
+            <iframe id="pdfViewer" class="hidden w-full h-full border-none"></iframe>
+        </main>
+    </div>
+
+    <script>
+        const searchInput = document.getElementById('searchInput');
+        const resultsDiv = document.getElementById('results');
+        const loadingDiv = document.getElementById('loading');
+        const noResultsDiv = document.getElementById('noResults');
+        const pdfViewer = document.getElementById('pdfViewer');
+        const placeholder = document.getElementById('placeholder');
+
+        let activeItem = null;
+
+        function goToPage(filename, page, element) {
+            if (activeItem) activeItem.classList.remove('active');
+            element.classList.add('active');
+            activeItem = element;
+
+            const url = `/static_pdfs/${filename}#page=${page}&view=FitH`;
+            pdfViewer.src = url;
+            pdfViewer.classList.remove('hidden');
+            placeholder.classList.add('hidden');
+        }
+
+        async function performSearch() {
+            const query = searchInput.value.trim();
+            if (query.length < 2) {
+                resultsDiv.innerHTML = '<div class="p-8 text-center text-gray-400 text-sm italic">Enter a keyword above to start searching</div>';
+                return;
+            }
+
+            loadingDiv.classList.remove('hidden');
+            noResultsDiv.classList.add('hidden');
+            resultsDiv.innerHTML = '';
+
+            try {
+                const response = await fetch(`/search?q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                
+                loadingDiv.classList.add('hidden');
+
+                if (data.results && data.results.length > 0) {
+                    data.results.forEach(result => {
+                        const card = document.createElement('div');
+                        card.className = 'result-card';
+                        card.onclick = () => goToPage(result.filename, result.page, card);
+                        
+                        const snippet = result.snippets[0] || '';
+                        const regex = new RegExp(`(${query})`, 'gi');
+                        const highlighted = snippet.replace(regex, '<span class="highlight">$1</span>');
+
+                        card.innerHTML = `
+                            <div class="flex justify-between items-start mb-1">
+                                <span class="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">PAGE ${result.page}</span>
+                                <span class="text-[9px] text-gray-400">${result.filename}</span>
+                            </div>
+                            <div class="text-sm text-gray-700 marathi-text line-clamp-2">${highlighted}</div>
+                        `;
+                        resultsDiv.appendChild(card);
+                    });
+                } else {
+                    noResultsDiv.classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Search error:', error);
+                loadingDiv.classList.add('hidden');
+            }
+        }
+
+        // Search as you type
+        let timer;
+        searchInput.addEventListener('input', () => {
+            clearTimeout(timer);
+            timer = setTimeout(performSearch, 300);
+        });
+    </script>
+ </body>
+ </html>
