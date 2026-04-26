@@ -6,4 +6,4 @@ __pycache__/
 env/
 venv/
 ENV/
-debug_text.txt
+# debug_text.txt  <- Keep this removed
