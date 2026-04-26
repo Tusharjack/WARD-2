@@ -16,11 +16,31 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 # Serve PDF files as static files
 app.mount("/static_pdfs", StaticFiles(directory=BASE_DIR), name="static_pdfs")
 
+import re
+
+def normalize_text(text: str) -> str:
+    # Remove common PDF encoding artifacts for Marathi/Hindi
+    # These characters often replace vowel marks (matras)
+    artifacts = {
+        'Ǔ': 'ि',
+        'ȣ': 'ी',
+        'Ĥ': 'प्र',
+        'ǽ': 'रु',
+        'ȶ': 'े',
+        'Đ': 'क्र',
+        'ͧ': '', # Zero-width or combining marks
+        'नाव[ ': 'नाव',
+    }
+    for art, repl in artifacts.items():
+        text = text.replace(art, repl)
+    return text
+
 def search_in_pdfs(query: str) -> List[Dict]:
     results = []
-    # Use absolute path to find PDFs
     pdf_files = [f for f in os.listdir(BASE_DIR) if f.lower().endswith('.pdf')]
-    print(f"Searching for '{query}' in {len(pdf_files)} PDF files at {BASE_DIR}")
+    
+    # Normalize query for consistent comparison
+    clean_query = normalize_text(query.lower())
     
     for pdf_file in pdf_files:
         pdf_path = os.path.join(BASE_DIR, pdf_file)
@@ -30,12 +50,14 @@ def search_in_pdfs(query: str) -> List[Dict]:
                 page = doc.load_page(page_num)
                 text = page.get_text()
                 
-                if query.lower() in text.lower():
-                    # Find snippets
+                # Normalize PDF text for searching
+                clean_text = normalize_text(text.lower())
+                
+                if clean_query in clean_text:
                     lines = [line.strip() for line in text.split('\n') if line.strip()]
                     for i, line in enumerate(lines):
-                        if query.lower() in line.lower():
-                            # Get a bit of context (current line and next line usually contains the name/ID)
+                        clean_line = normalize_text(line.lower())
+                        if clean_query in clean_line:
                             snippet = line
                             if i + 1 < len(lines):
                                 snippet += " " + lines[i+1]
@@ -45,9 +67,6 @@ def search_in_pdfs(query: str) -> List[Dict]:
                                 "page": page_num + 1,
                                 "snippets": [snippet]
                             })
-                            # Once we find a match on a page, we could continue or break. 
-                            # For voter lists, multiple people might match (e.g. same surname).
-                            # Let's not break, but let's avoid too many duplicate snippets for the same ID.
             doc.close()
         except Exception as e:
             print(f"Error processing {pdf_file}: {e}")
