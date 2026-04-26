@@ -142,12 +142,27 @@
         </aside>
 
         <!-- PDF Viewer Panel -->
-        <main id="pdfViewerPanel" class="viewer-panel flex-1 bg-gray-800 relative min-h-[500px]">
-            <div id="placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-white/50 p-8 text-center">
-                <i class="fas fa-file-pdf text-6xl mb-4 opacity-20"></i>
-                <p class="text-lg marathi-text">यादीत नाव पाहण्यासाठी डावीकडील निकालावर क्लिक करा</p>
+        <main id="pdfViewerPanel" class="viewer-panel flex-1 bg-gray-800 flex flex-col relative min-h-[500px]">
+            <!-- Viewer Toolbar -->
+            <div id="viewerToolbar" class="hidden p-3 bg-gray-900 text-white flex items-center justify-between border-b border-gray-700">
+                <button onclick="hideInterface()" class="text-[10px] md:text-xs bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded flex items-center gap-2 transition-all">
+                    <i class="fas fa-home text-orange-500"></i> मुख्य पान (Home)
+                </button>
+                
+                <span id="viewerPageInfo" class="text-[9px] md:text-[10px] font-bold uppercase tracking-widest opacity-60">PDF Viewer</span>
+
+                <button onclick="scrollToResults()" class="lg:hidden text-[10px] bg-orange-600 hover:bg-orange-700 px-3 py-1.5 rounded flex items-center gap-2 transition-all shadow-lg">
+                    <i class="fas fa-list"></i> निकालांकडे जा
+                </button>
             </div>
-            <iframe id="pdfViewer" class="hidden w-full h-full border-none"></iframe>
+
+            <div class="flex-1 relative overflow-hidden">
+                <div id="placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-white/50 p-8 text-center">
+                    <i class="fas fa-file-pdf text-6xl mb-4 opacity-20"></i>
+                    <p class="text-lg marathi-text">यादीत नाव पाहण्यासाठी डावीकडील निकालावर क्लिक करा</p>
+                </div>
+                <iframe id="pdfViewer" class="hidden w-full h-full border-none"></iframe>
+            </div>
         </main>
     </div>
 
@@ -171,6 +186,8 @@
         const pdfViewer = document.getElementById('pdfViewer');
         const placeholder = document.getElementById('placeholder');
         const resultCount = document.getElementById('resultCount');
+        const viewerToolbar = document.getElementById('viewerToolbar');
+        const viewerPageInfo = document.getElementById('viewerPageInfo');
 
         let activeItem = null;
 
@@ -184,6 +201,11 @@
             landingPage.classList.remove('hidden');
             searchInterface.classList.add('hidden');
             document.body.classList.remove('h-screen');
+            viewerToolbar.classList.add('hidden');
+        }
+
+        function scrollToResults() {
+            document.querySelector('aside').scrollIntoView({ behavior: 'smooth' });
         }
 
         backToLanding.onclick = hideInterface;
@@ -198,6 +220,10 @@
             pdfViewer.src = url;
             pdfViewer.classList.remove('hidden');
             placeholder.classList.add('hidden');
+            
+            // Show viewer toolbar and update info
+            viewerToolbar.classList.remove('hidden');
+            viewerPageInfo.innerText = `Page ${page} - ${filename}`;
 
             // On mobile, scroll to the viewer automatically
             if (window.innerWidth < 1024) {
