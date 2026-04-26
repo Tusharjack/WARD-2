@@ -51,8 +51,23 @@
             background-color: #f9fafb;
         }
         .result-card.active {
-            background-color: #eff6ff;
-            border-left: 4px solid #3b82f6;
+            background-color: #3b82f6;
+            color: white;
+            border-left: none;
+        }
+        .result-card.active .text-gray-700 {
+            color: white;
+        }
+        .result-card.active .text-blue-600 {
+            color: #dbeafe;
+            background-color: #1d4ed8;
+        }
+        .result-card.active .text-gray-400 {
+            color: #dbeafe;
+        }
+        .result-card.active .highlight {
+            background-color: white;
+            color: #1d4ed8;
         }
         .highlight {
             background-color: #fef08a;
@@ -131,12 +146,16 @@
 
         let activeItem = null;
 
-        function goToPage(filename, page, element) {
+        function goToPage(filename, page, element, query) {
             if (activeItem) activeItem.classList.remove('active');
             element.classList.add('active');
             activeItem = element;
 
-            const url = `/static_pdfs/${filename}#page=${page}&view=FitH`;
+            // Smooth scroll into view if needed
+            element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+            // Using our backend highlighter for guaranteed results
+            const url = `/view_pdf?filename=${encodeURIComponent(filename)}&page=${page}&q=${encodeURIComponent(query)}#page=${page}&view=FitH`;
             pdfViewer.src = url;
             pdfViewer.classList.remove('hidden');
             placeholder.classList.add('hidden');
@@ -163,7 +182,7 @@
                     data.results.forEach(result => {
                         const card = document.createElement('div');
                         card.className = 'result-card';
-                        card.onclick = () => goToPage(result.filename, result.page, card);
+                        card.onclick = () => goToPage(result.filename, result.page, card, query);
                         
                         const snippet = result.snippets[0] || '';
                         const regex = new RegExp(`(${query})`, 'gi');

@@ -54,6 +54,41 @@ def search_in_pdfs(query: str) -> List[Dict]:
             
     return results
 
+from fastapi.responses import HTMLResponse, StreamingResponse
+import io
+
+@app.get("/view_pdf")
+async def view_pdf(filename: str, page: int, q: str):
+    pdf_path = os.path.join(BASE_DIR, filename)
+    if not os.path.exists(pdf_path):
+        return {"error": "File not found"}
+    
+    try:
+        doc = fitz.open(pdf_path)
+        # We only highlight the specific page to keep it fast
+        target_page = doc[page - 1]
+        
+        # Find and highlight the text
+        text_instances = target_page.search_for(q)
+        for inst in text_instances:
+            annot = target_page.add_highlight_annot(inst)
+            annot.update()
+            
+        # Save to memory stream
+        pdf_stream = io.BytesIO()
+        doc.save(pdf_stream)
+        doc.close()
+        pdf_stream.seek(0)
+        
+        return StreamingResponse(
+            pdf_stream, 
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"inline; filename={filename}"}
+        )
+    except Exception as e:
+        print(f"Error highlighting PDF: {e}")
+        return {"error": str(e)}
+
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     pdf_files = [f for f in os.listdir(BASE_DIR) if f.lower().endswith('.pdf')]
