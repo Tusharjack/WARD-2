@@ -224,13 +224,25 @@
         const viewerToolbar = document.getElementById('viewerToolbar');
         const pageDisplay = document.getElementById('pageDisplay');
 
-        let currentActiveItem = null; // Renamed to avoid confusion
+        let currentActiveItem = null;
+        let pdfDoc = null;
+        let currentFilename = "";
+        let currentPageNum = 1;
+        let currentSearchQuery = "";
 
         // Initialize PDF.js
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
         async function renderPDFPage(filename, pageNum, query, isRetry = false) {
             if (!filename || !pageNum) return;
+            
+            // Cleanup previous document
+            if (pdfDoc) {
+                try {
+                    await pdfDoc.destroy();
+                } catch(e) {}
+                pdfDoc = null;
+            }
             
             pdfLoading.classList.remove('hidden');
             pdfCanvas.classList.add('hidden');
@@ -244,34 +256,44 @@
                 // Fetch the highlighted page from backend
                 const url = `/view_pdf?filename=${encodeURIComponent(filename)}&page=${pageNum}&q=${encodeURIComponent(currentSearchQuery)}`;
                 
-                // Use a unique ID for the loading task to allow cancellation if needed
-                const loadingTask = pdfjsLib.getDocument({
-                    url: url,
-                    rangeChunkSize: 65536,
-                    disableAutoFetch: true
-                });
+                // Fetch first to check for errors
+                const response = await fetch(url);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Server error: ${errorText}`);
+                }
                 
-                pdfDoc = await loadingTask.promise;
-                const page = await pdfDoc.getPage(1);
+                const blob = await response.blob();
+                const blobUrl = URL.createObjectURL(blob);
                 
-                // High-quality rendering scale
-                const scale = window.innerWidth < 768 ? 1.5 : 2.0;
-                const viewport = page.getViewport({ scale: scale });
-                
-                const context = pdfCanvas.getContext('2d', { alpha: false });
-                pdfCanvas.height = viewport.height;
-                pdfCanvas.width = viewport.width;
+                try {
+                    const loadingTask = pdfjsLib.getDocument(blobUrl);
+                    
+                    pdfDoc = await loadingTask.promise;
+                    const page = await pdfDoc.getPage(1);
+                    
+                    // High-quality rendering scale
+                    const scale = window.innerWidth < 768 ? 1.5 : 2.0;
+                    const viewport = page.getViewport({ scale: scale });
+                    
+                    const context = pdfCanvas.getContext('2d', { alpha: false });
+                    pdfCanvas.height = viewport.height;
+                    pdfCanvas.width = viewport.width;
 
-                const renderContext = {
-                    canvasContext: context,
-                    viewport: viewport,
-                    enableWebGL: true
-                };
-                
-                await page.render(renderContext).promise;
-                
-                pdfLoading.classList.add('hidden');
-                pdfCanvas.classList.remove('hidden');
+                    const renderContext = {
+                        canvasContext: context,
+                        viewport: viewport,
+                        enableWebGL: true
+                    };
+                    
+                    await page.render(renderContext).promise;
+                    
+                    pdfLoading.classList.add('hidden');
+                    pdfCanvas.classList.remove('hidden');
+                } finally {
+                    // Cleanup blob URL
+                    URL.revokeObjectURL(blobUrl);
+                }
             } catch (error) {
                 console.error('Error rendering PDF:', error);
                 pdfLoading.classList.add('hidden');

@@ -92,10 +92,10 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 import io
 
 @app.get("/view_pdf")
-async def view_pdf(filename: str, page: int, q: str):
+async def view_pdf(filename: str, page: int, q: str = None):
     pdf_path = os.path.join(BASE_DIR, filename)
     if not os.path.exists(pdf_path):
-        return {"error": "File not found"}
+        return HTMLResponse(content="File not found", status_code=404)
     
     try:
         doc = fitz.open(pdf_path)
@@ -103,38 +103,40 @@ async def view_pdf(filename: str, page: int, q: str):
         total_pages = len(doc)
         safe_page = max(1, min(page, total_pages))
         
-        # Create a new single-page document for the requested page
+        # Create a new document for the single page
         new_doc = fitz.open()
         new_doc.insert_pdf(doc, from_page=safe_page-1, to_page=safe_page-1)
-        
         target_page = new_doc[0]
         
         # Find and highlight the text
-        if q:
+        if q and len(q) >= 2:
+            # Try searching for original query
             text_instances = target_page.search_for(q)
+            
+            # If no instances found and it's Marathi, it might be due to encoding
+            # However, fitz search is usually literal. 
+            # We don't want to over-complicate this unless necessary.
+            
             for inst in text_instances:
                 annot = target_page.add_highlight_annot(inst)
                 annot.update()
             
-        # Save to memory stream
-        pdf_stream = io.BytesIO()
-        new_doc.save(pdf_stream)
+        # Get PDF bytes with compression
+        pdf_bytes = new_doc.tobytes(garbage=3, deflate=True)
         new_doc.close()
         doc.close()
-        pdf_stream.seek(0)
         
         return StreamingResponse(
-            pdf_stream, 
+            io.BytesIO(pdf_bytes), 
             media_type="application/pdf",
             headers={
                 "Content-Disposition": f"inline; filename={filename}",
-                "X-Total-Pages": str(total_pages),
-                "X-Current-Page": str(safe_page)
+                "Cache-Control": "public, max-age=3600"
             }
         )
     except Exception as e:
         print(f"Error highlighting PDF: {e}")
-        return {"error": str(e)}
+        return HTMLResponse(content=f"Error: {str(e)}", status_code=500)
 
 @app.on_event("startup")
 async def startup_event():
