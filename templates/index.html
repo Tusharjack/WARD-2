@@ -120,12 +120,12 @@
     <!-- Search Results & Viewer Section (Hidden by default) -->
     <div id="searchInterface" class="hidden flex-1 flex flex-col lg:flex-row overflow-hidden bg-white">
         <!-- Sidebar Results -->
-        <aside class="w-full lg:w-96 border-r border-gray-200 flex flex-col bg-gray-50">
-            <div class="p-4 bg-orange-600 text-white flex items-center justify-between shadow-md">
-                <button id="backToLanding" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-all">
-                    <i class="fas fa-home"></i> होम पेज
+        <aside class="w-full lg:w-96 border-r border-gray-200 flex flex-col bg-gray-50 overflow-y-auto">
+            <div class="p-4 bg-orange-600 text-white flex items-center justify-between shadow-md sticky top-0 z-10">
+                <button id="backToLanding" class="bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg font-bold text-xs flex items-center gap-2 transition-all">
+                    <i class="fas fa-home"></i> होम
                 </button>
-                <span id="resultCount" class="text-xs font-bold uppercase tracking-widest">निकाल</span>
+                <span id="resultCount" class="text-[10px] font-bold uppercase tracking-widest">निकाल</span>
             </div>
 
             <div id="loading" class="hidden p-12 text-center">
@@ -144,17 +144,17 @@
         </aside>
 
         <!-- PDF Viewer Panel -->
-        <main id="pdfViewerPanel" class="viewer-panel flex-1 bg-gray-800 flex flex-col relative min-h-[500px]">
+        <main id="pdfViewerPanel" class="viewer-panel hidden lg:flex flex-1 bg-gray-800 flex flex-col relative min-h-[500px]">
             <!-- Viewer Toolbar -->
-            <div id="viewerToolbar" class="hidden p-3 bg-gray-900 text-white flex items-center justify-between border-b border-gray-700">
-                <button onclick="hideInterface()" class="text-[10px] md:text-xs bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded flex items-center gap-2 transition-all">
-                    <i class="fas fa-home text-orange-500"></i> मुख्य पान (Home)
+            <div id="viewerToolbar" class="p-3 bg-gray-900 text-white flex items-center justify-between border-b border-gray-700 sticky top-0 z-10">
+                <button onclick="showResults()" class="lg:hidden bg-orange-600 hover:bg-orange-700 px-3 py-1.5 rounded flex items-center gap-2 transition-all shadow-lg text-xs font-bold">
+                    <i class="fas fa-list"></i> निकालांकडे जा
                 </button>
                 
                 <span id="viewerPageInfo" class="text-[9px] md:text-[10px] font-bold uppercase tracking-widest opacity-60">PDF Viewer</span>
 
-                <button onclick="scrollToResults()" class="lg:hidden text-[10px] bg-orange-600 hover:bg-orange-700 px-3 py-1.5 rounded flex items-center gap-2 transition-all shadow-lg">
-                    <i class="fas fa-list"></i> निकालांकडे जा
+                <button onclick="hideInterface()" class="text-[10px] md:text-xs bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded flex items-center gap-2 transition-all">
+                    <i class="fas fa-home text-orange-500"></i> होम
                 </button>
             </div>
 
@@ -203,11 +203,10 @@
             landingPage.classList.remove('hidden');
             searchInterface.classList.add('hidden');
             document.body.classList.remove('h-screen');
-            viewerToolbar.classList.add('hidden');
-        }
-
-        function scrollToResults() {
-            document.querySelector('aside').scrollIntoView({ behavior: 'smooth' });
+            // Reset mobile views
+            document.querySelector('aside').classList.remove('hidden');
+            document.getElementById('pdfViewerPanel').classList.add('hidden');
+            document.getElementById('pdfViewerPanel').classList.remove('flex');
         }
 
         backToLanding.onclick = hideInterface;
@@ -227,10 +226,20 @@
             viewerToolbar.classList.remove('hidden');
             viewerPageInfo.innerText = `Page ${page} - ${filename}`;
 
-            // On mobile, scroll to the viewer automatically
+            // On mobile, switch view directly to PDF
             if (window.innerWidth < 1024) {
-                document.getElementById('pdfViewerPanel').scrollIntoView({ behavior: 'smooth' });
+                document.querySelector('aside').classList.add('hidden');
+                document.getElementById('pdfViewerPanel').classList.remove('hidden');
+                document.getElementById('pdfViewerPanel').classList.add('flex');
+                window.scrollTo(0, 0);
             }
+        }
+
+        function showResults() {
+            document.querySelector('aside').classList.remove('hidden');
+            document.getElementById('pdfViewerPanel').classList.add('hidden');
+            document.getElementById('pdfViewerPanel').classList.remove('flex');
+            window.scrollTo(0, 0);
         }
 
         async function performSearch() {
@@ -261,11 +270,11 @@
                         const highlighted = snippet.replace(regex, '<span class="highlight">$1</span>');
 
                         card.innerHTML = `
-                            <div class="flex justify-between items-center mb-2">
-                                <span class="text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full uppercase tracking-tighter">Page ${result.page}</span>
-                                <span class="text-[10px] font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded-full uppercase">यादी पहा <i class="fas fa-eye ml-1"></i></span>
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-[9px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full uppercase tracking-tighter">Page ${result.page}</span>
+                                <i class="fas fa-chevron-right text-orange-300 text-[10px]"></i>
                             </div>
-                            <div class="text-sm text-gray-800 font-medium marathi-text line-clamp-2">${highlighted}</div>
+                            <div class="text-[13px] text-gray-800 font-semibold marathi-text leading-tight">${highlighted}</div>
                         `;
                         resultsDiv.appendChild(card);
                     });
