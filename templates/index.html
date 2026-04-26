@@ -224,41 +224,48 @@
         const viewerToolbar = document.getElementById('viewerToolbar');
         const pageDisplay = document.getElementById('pageDisplay');
 
-        let activeItem = null;
-        let pdfDoc = null;
-        let currentFilename = null;
-        let currentPageNum = 1;
-        let currentSearchQuery = "";
+        let currentActiveItem = null; // Renamed to avoid confusion
 
         // Initialize PDF.js
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
         async function renderPDFPage(filename, pageNum, query) {
+            if (!filename || !pageNum) return;
+            
             pdfLoading.classList.remove('hidden');
             pdfCanvas.classList.add('hidden');
             
             currentFilename = filename;
             currentPageNum = pageNum;
-            currentSearchQuery = query;
+            currentSearchQuery = query || "";
             pageDisplay.innerText = `Page ${pageNum}`;
 
             try {
                 // Fetch the highlighted page from backend
-                const url = `/view_pdf?filename=${encodeURIComponent(filename)}&page=${pageNum}&q=${encodeURIComponent(query)}`;
-                const loadingTask = pdfjsLib.getDocument(url);
-                pdfDoc = await loadingTask.promise;
+                const url = `/view_pdf?filename=${encodeURIComponent(filename)}&page=${pageNum}&q=${encodeURIComponent(currentSearchQuery)}`;
                 
-                // Since our backend returns a single-page PDF, we always render its page 1
+                // Use a unique ID for the loading task to allow cancellation if needed
+                const loadingTask = pdfjsLib.getDocument({
+                    url: url,
+                    rangeChunkSize: 65536,
+                    disableAutoFetch: true
+                });
+                
+                pdfDoc = await loadingTask.promise;
                 const page = await pdfDoc.getPage(1);
                 
-                const viewport = page.getViewport({ scale: window.innerWidth < 768 ? 1.5 : 2.0 });
-                const context = pdfCanvas.getContext('2d');
+                // High-quality rendering scale
+                const scale = window.innerWidth < 768 ? 1.5 : 2.0;
+                const viewport = page.getViewport({ scale: scale });
+                
+                const context = pdfCanvas.getContext('2d', { alpha: false });
                 pdfCanvas.height = viewport.height;
                 pdfCanvas.width = viewport.width;
 
                 const renderContext = {
                     canvasContext: context,
-                    viewport: viewport
+                    viewport: viewport,
+                    enableWebGL: true
                 };
                 
                 await page.render(renderContext).promise;
@@ -268,13 +275,23 @@
             } catch (error) {
                 console.error('Error rendering PDF:', error);
                 pdfLoading.classList.add('hidden');
-                alert('PDF दाखवताना त्रुटी आली.');
+                // Only alert if it's not a cancellation
+                if (error.name !== 'RenderingCancelledException') {
+                    console.log('Rendering failed, retrying once...');
+                    // Attempt one silent retry without alert
+                    setTimeout(() => renderPDFPage(filename, pageNum, query), 500);
+                }
             }
         }
 
         async function changePage(offset) {
             const nextP = currentPageNum + offset;
-            if (nextP < 1) return; // Backend handles max page check
+            if (nextP < 1) return;
+            // PDF.js objects need cleanup
+            if (pdfDoc) {
+                await pdfDoc.destroy();
+                pdfDoc = null;
+            }
             await renderPDFPage(currentFilename, nextP, currentSearchQuery);
         }
 
@@ -282,6 +299,8 @@
             landingPage.classList.add('hidden');
             searchInterface.classList.remove('hidden');
             document.body.classList.add('h-screen');
+            // Add a history state so back button works
+            history.pushState({view: 'results'}, '');
         }
 
         function hideInterface() {
@@ -292,14 +311,29 @@
             document.querySelector('aside').classList.remove('hidden');
             document.getElementById('pdfViewerPanel').classList.add('hidden');
             document.getElementById('pdfViewerPanel').classList.remove('flex');
+            viewerToolbar.classList.add('hidden');
         }
 
-        backToLanding.onclick = hideInterface;
+        // Handle browser back button
+        window.onpopstate = function(event) {
+            if (event.state) {
+                if (event.state.view === 'results') {
+                    showResults();
+                }
+            } else {
+                hideInterface();
+            }
+        };
+
+        backToLanding.onclick = () => {
+            hideInterface();
+            history.pushState(null, '');
+        };
 
         function goToPage(filename, page, element, query) {
-            if (activeItem) activeItem.classList.remove('active');
+            if (currentActiveItem) currentActiveItem.classList.remove('active');
             element.classList.add('active');
-            activeItem = element;
+            currentActiveItem = element;
 
             // Update viewer
             renderPDFPage(filename, page, query);
@@ -315,6 +349,8 @@
                 document.getElementById('pdfViewerPanel').classList.remove('hidden');
                 document.getElementById('pdfViewerPanel').classList.add('flex');
                 window.scrollTo(0, 0);
+                // Add state for back button to return to results
+                history.pushState({view: 'pdf'}, '');
             }
         }
 
@@ -323,6 +359,9 @@
             document.getElementById('pdfViewerPanel').classList.add('hidden');
             document.getElementById('pdfViewerPanel').classList.remove('flex');
             window.scrollTo(0, 0);
+            if (window.innerWidth < 1024) {
+                history.pushState({view: 'results'}, '');
+            }
         }
 
         async function performSearch() {
