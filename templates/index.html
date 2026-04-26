@@ -3,158 +3,185 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF Reader - Search</title>
+    <title>मतदार शोध - भाजपा प्रणित उंचगाव विकास आघाडी</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap');
+        
         body {
-            background-color: #f3f4f6;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
+            font-family: 'Poppins', sans-serif;
+            background-color: #fef3c7; /* Light saffron tint */
         }
-        .toolbar {
-            background-color: #ffffff;
-            border-bottom: 1px solid #e5e7eb;
-            height: 60px;
-            display: flex;
-            align-items: center;
-            padding: 0 20px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-            z-index: 10;
-        }
-        .main-container {
-            flex: 1;
-            display: flex;
-            overflow: hidden;
-        }
-        .search-sidebar {
-            width: 320px;
-            background: white;
-            border-right: 1px solid #e5e7eb;
-            display: flex;
-            flex-direction: column;
-        }
-        .pdf-viewer-container {
-            flex: 1;
-            background: #525659;
-            position: relative;
-        }
-        .result-card {
-            padding: 12px 16px;
-            border-bottom: 1px solid #f3f4f6;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        .result-card:hover {
-            background-color: #f9fafb;
-        }
-        .result-card.active {
-            background-color: #3b82f6;
-            color: white;
-            border-left: none;
-        }
-        .result-card.active .text-gray-700 {
-            color: white;
-        }
-        .result-card.active .text-blue-600 {
-            color: #dbeafe;
-            background-color: #1d4ed8;
-        }
-        .result-card.active .text-gray-400 {
-            color: #dbeafe;
-        }
-        .result-card.active .highlight {
-            background-color: white;
-            color: #1d4ed8;
-        }
-        .highlight {
-            background-color: #fef08a;
-            font-weight: 600;
-            color: #1e40af;
-        }
+        .bjp-orange { background-color: #FF9933; }
+        .bjp-green { background-color: #138808; }
+        .text-bjp-orange { color: #FF9933; }
+        
         .marathi-text {
             font-family: 'Arial Unicode MS', 'Sakal Marathi', sans-serif;
         }
+        
+        .hero-gradient {
+            background: linear-gradient(135deg, #FF9933 0%, #ffffff 50%, #138808 100%);
+        }
+
+        .result-card {
+            transition: all 0.3s ease;
+            border-left: 4px solid transparent;
+        }
+        .result-card.active {
+            border-left-color: #FF9933;
+            background-color: #fff7ed;
+            transform: translateX(5px);
+        }
+        
+        .highlight {
+            background-color: #fef08a;
+            font-weight: 700;
+            color: #92400e;
+            padding: 0 2px;
+            border-radius: 2px;
+        }
+
+        /* Mobile Adjustments */
+        @media (max-width: 1024px) {
+            .main-content {
+                flex-direction: column;
+            }
+            .viewer-panel {
+                height: 60vh;
+            }
+        }
     </style>
 </head>
-<body>
-    <!-- Simple Header Toolbar -->
-    <header class="toolbar justify-between">
-        <div class="flex items-center gap-4">
-            <i class="fas fa-file-pdf text-red-600 text-2xl"></i>
-            <div>
-                <h1 class="text-sm font-bold text-gray-800">PDF Document Reader</h1>
-                <p class="text-[10px] text-gray-500 uppercase">{{ ", ".join(pdf_names) }}</p>
+<body class="min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bjp-orange text-white py-4 shadow-lg sticky top-0 z-50">
+        <div class="container mx-auto px-4 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <i class="fas fa-users text-2xl"></i>
+                <div>
+                    <h1 class="font-bold text-lg md:text-xl leading-tight">भाजपा प्रणित उंचगाव विकास आघाडी</h1>
+                    <p class="text-xs md:text-sm opacity-90">वॉर्ड क्रमांक 2 पोट निवडणूक उंचगाव ग्रामपंचायत 2026</p>
+                </div>
             </div>
-        </div>
-        
-        <div class="flex-1 max-w-xl px-8">
-            <div class="relative">
-                <input type="text" id="searchInput" 
-                    class="w-full bg-gray-100 border border-gray-300 rounded-md py-1.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                    placeholder="Search by Name or ID (e.g. शुभम or AZL)...">
-                <i class="fas fa-search absolute left-3 top-2.5 text-gray-400 text-sm"></i>
+            <div class="hidden md:block">
+                <span class="bg-white/20 px-3 py-1 rounded-full text-xs font-semibold">मतदार शोध पोर्टल</span>
             </div>
-        </div>
-
-        <div class="text-xs text-gray-500 font-medium">
-            <span class="bg-gray-100 px-2 py-1 rounded">{{ pdf_count }} Documents Connected</span>
         </div>
     </header>
 
-    <div class="main-container">
-        <!-- Results Sidebar -->
-        <aside class="search-sidebar">
-            <div class="p-3 border-bottom bg-gray-50 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                Search Results
-            </div>
-            
-            <div id="loading" class="hidden p-8 text-center">
-                <div class="inline-block animate-spin rounded-full h-5 w-5 border-2 border-blue-500 border-t-transparent"></div>
-            </div>
+    <!-- Hero / Landing Section -->
+    <div id="landingPage" class="hero-gradient py-12 md:py-20 flex-1">
+        <div class="container mx-auto px-4 text-center">
+            <div class="max-w-3xl mx-auto bg-white/80 backdrop-blur-md p-8 rounded-3xl shadow-2xl border border-white">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/Bharatiya_Janata_Party_logo.svg/512px-Bharatiya_Janata_Party_logo.svg.png" 
+                     alt="BJP Logo" class="h-20 mx-auto mb-6">
+                
+                <h2 class="text-3xl md:text-4xl font-extrabold text-gray-800 mb-4 marathi-text">
+                    आपले नाव मतदार यादीत शोधा
+                </h2>
+                <p class="text-gray-600 mb-8 md:text-lg">
+                    उंचगाव ग्रामपंचायत पोट निवडणूक 2026 साठी वॉर्ड क्रमांक 2 ची अधिकृत मतदार यादी
+                </p>
 
-            <div id="results" class="flex-1 overflow-y-auto">
-                <div class="p-8 text-center text-gray-400 text-sm italic">
-                    Enter a keyword above to start searching
+                <div class="relative max-w-lg mx-auto mb-6">
+                    <input type="text" id="searchInput" 
+                        class="w-full px-6 py-4 rounded-full border-2 border-orange-200 focus:border-orange-500 focus:outline-none shadow-lg text-lg pr-16"
+                        placeholder="नाव किंवा ओळखपत्र क्रमांक टाका...">
+                    <button id="searchBtn" class="absolute right-2 top-2 bjp-orange text-white w-12 h-12 rounded-full hover:bg-orange-600 transition-colors shadow-md">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+                
+                <div class="flex flex-wrap justify-center gap-4 text-sm text-gray-500">
+                    <span class="flex items-center gap-1"><i class="fas fa-check-circle text-green-600"></i> वॉर्ड क्र. 2</span>
+                    <span class="flex items-center gap-1"><i class="fas fa-check-circle text-green-600"></i> पोट निवडणूक 2026</span>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <div id="noResults" class="hidden p-8 text-center text-gray-500 text-sm">
-                No matches found in the document.
+    <!-- Search Results & Viewer Section (Hidden by default) -->
+    <div id="searchInterface" class="hidden flex-1 flex flex-col lg:flex-row overflow-hidden bg-white">
+        <!-- Sidebar Results -->
+        <aside class="w-full lg:w-96 border-r border-gray-200 flex flex-col bg-gray-50">
+            <div class="p-4 bg-white border-b border-gray-200 flex items-center justify-between">
+                <button id="backToLanding" class="text-orange-600 hover:text-orange-700 font-semibold text-sm flex items-center gap-2">
+                    <i class="fas fa-arrow-left"></i> मागे जा
+                </button>
+                <span id="resultCount" class="text-xs font-bold text-gray-500 uppercase tracking-widest">निकाल</span>
+            </div>
+
+            <div id="loading" class="hidden p-12 text-center">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-orange-500 border-t-transparent"></div>
+                <p class="mt-4 text-sm text-gray-500 font-medium">शोधत आहे...</p>
+            </div>
+
+            <div id="results" class="flex-1 overflow-y-auto p-2 space-y-2">
+                <!-- Cards injected here -->
+            </div>
+
+            <div id="noResults" class="hidden p-12 text-center">
+                <i class="fas fa-search-minus text-4xl text-gray-300 mb-4"></i>
+                <p class="text-gray-500 marathi-text">या नावाचे मतदार सापडले नाहीत. कृपया नाव तपासा.</p>
             </div>
         </aside>
 
-        <!-- PDF Viewer -->
-        <main class="pdf-viewer-container">
-            <div id="placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
-                <i class="far fa-file-pdf text-8xl mb-4 opacity-10"></i>
-                <p class="text-lg font-medium opacity-30">Select a search result to view</p>
+        <!-- PDF Viewer Panel -->
+        <main class="viewer-panel flex-1 bg-gray-800 relative min-h-[500px]">
+            <div id="placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-white/50 p-8 text-center">
+                <i class="fas fa-file-pdf text-6xl mb-4 opacity-20"></i>
+                <p class="text-lg marathi-text">यादीत नाव पाहण्यासाठी डावीकडील निकालावर क्लिक करा</p>
             </div>
             <iframe id="pdfViewer" class="hidden w-full h-full border-none"></iframe>
         </main>
     </div>
 
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-white py-6">
+        <div class="container mx-auto px-4 text-center">
+            <p class="text-sm font-semibold mb-2">भाजपा प्रणित उंचगाव विकास आघाडी</p>
+            <p class="text-[10px] opacity-50 uppercase tracking-widest">© 2026 उचगांव ग्रामपंचायत निवडणूक पोर्टल</p>
+        </div>
+    </footer>
+
     <script>
         const searchInput = document.getElementById('searchInput');
+        const searchBtn = document.getElementById('searchBtn');
+        const landingPage = document.getElementById('landingPage');
+        const searchInterface = document.getElementById('searchInterface');
+        const backToLanding = document.getElementById('backToLanding');
         const resultsDiv = document.getElementById('results');
         const loadingDiv = document.getElementById('loading');
         const noResultsDiv = document.getElementById('noResults');
         const pdfViewer = document.getElementById('pdfViewer');
         const placeholder = document.getElementById('placeholder');
+        const resultCount = document.getElementById('resultCount');
 
         let activeItem = null;
+
+        function showInterface() {
+            landingPage.classList.add('hidden');
+            searchInterface.classList.remove('hidden');
+            document.body.classList.add('h-screen');
+        }
+
+        function hideInterface() {
+            landingPage.classList.remove('hidden');
+            searchInterface.classList.add('hidden');
+            document.body.classList.remove('h-screen');
+        }
+
+        backToLanding.onclick = hideInterface;
 
         function goToPage(filename, page, element, query) {
             if (activeItem) activeItem.classList.remove('active');
             element.classList.add('active');
             activeItem = element;
 
-            // Smooth scroll into view if needed
             element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-            // Using our backend highlighter for guaranteed results
             const url = `/view_pdf?filename=${encodeURIComponent(filename)}&page=${page}&q=${encodeURIComponent(query)}#page=${page}&view=FitH`;
             pdfViewer.src = url;
             pdfViewer.classList.remove('hidden');
@@ -163,14 +190,13 @@
 
         async function performSearch() {
             const query = searchInput.value.trim();
-            if (query.length < 2) {
-                resultsDiv.innerHTML = '<div class="p-8 text-center text-gray-400 text-sm italic">Enter a keyword above to start searching</div>';
-                return;
-            }
+            if (query.length < 2) return;
 
+            showInterface();
             loadingDiv.classList.remove('hidden');
             noResultsDiv.classList.add('hidden');
             resultsDiv.innerHTML = '';
+            resultCount.innerText = "निकाल";
 
             try {
                 const response = await fetch(`/search?q=${encodeURIComponent(query)}`);
@@ -179,9 +205,10 @@
                 loadingDiv.classList.add('hidden');
 
                 if (data.results && data.results.length > 0) {
+                    resultCount.innerText = `${data.results.length} मतदार सापडले`;
                     data.results.forEach(result => {
                         const card = document.createElement('div');
-                        card.className = 'result-card';
+                        card.className = 'result-card bg-white p-4 rounded-xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md';
                         card.onclick = () => goToPage(result.filename, result.page, card, query);
                         
                         const snippet = result.snippets[0] || '';
@@ -189,11 +216,11 @@
                         const highlighted = snippet.replace(regex, '<span class="highlight">$1</span>');
 
                         card.innerHTML = `
-                            <div class="flex justify-between items-start mb-1">
-                                <span class="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">PAGE ${result.page}</span>
-                                <span class="text-[9px] text-gray-400">${result.filename}</span>
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full uppercase tracking-tighter">Page ${result.page}</span>
+                                <i class="fas fa-chevron-right text-gray-300 text-xs"></i>
                             </div>
-                            <div class="text-sm text-gray-700 marathi-text line-clamp-2">${highlighted}</div>
+                            <div class="text-sm text-gray-800 font-medium marathi-text line-clamp-2">${highlighted}</div>
                         `;
                         resultsDiv.appendChild(card);
                     });
@@ -206,12 +233,10 @@
             }
         }
 
-        // Search as you type
-        let timer;
-        searchInput.addEventListener('input', () => {
-            clearTimeout(timer);
-            timer = setTimeout(performSearch, 300);
-        });
-    </script>
+        searchBtn.onclick = performSearch;
+        searchInput.onkeypress = (e) => {
+             if (e.key === 'Enter') performSearch();
+         };
+     </script>
  </body>
  </html>
