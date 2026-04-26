@@ -297,13 +297,20 @@
             } catch (error) {
                 console.error('Error rendering PDF:', error);
                 pdfLoading.classList.add('hidden');
+                
+                let errorMsg = 'PDF दाखवताना त्रुटी आली.';
+                if (error.message.includes('Server error')) {
+                    errorMsg += '\n\nसर्व्हर त्रुटी: ' + error.message.replace('Server error: ', '');
+                } else {
+                    errorMsg += '\n\nतांत्रिक माहिती: ' + error.message;
+                }
+                
                 // Only alert if it's not a cancellation
                 if (error.name !== 'RenderingCancelledException' && !isRetry) {
                     console.log('Rendering failed, retrying once...');
-                    // Attempt one silent retry without alert
-                    setTimeout(() => renderPDFPage(filename, pageNum, query, true), 500);
+                    setTimeout(() => renderPDFPage(filename, pageNum, query, true), 800);
                 } else if (error.name !== 'RenderingCancelledException') {
-                    alert('PDF दाखवताना त्रुटी आली. कृपया पुन्हा प्रयत्न करा.');
+                    alert(errorMsg + '\n\nकृपया पेज रिफ्रेश करून पुन्हा प्रयत्न करा.');
                 }
             }
         }

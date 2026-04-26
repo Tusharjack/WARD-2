@@ -20,7 +20,6 @@ import re
 
 def normalize_text(text: str) -> str:
     # Remove common PDF encoding artifacts for Marathi/Hindi
-    # These characters often replace vowel marks (matras)
     artifacts = {
         'Ǔ': 'ि',
         'ȣ': 'ी',
@@ -28,11 +27,23 @@ def normalize_text(text: str) -> str:
         'ǽ': 'रु',
         'ȶ': 'े',
         'Đ': 'क्र',
-        'ͧ': '', # Zero-width or combining marks
+        'ͧ': '', 
         'नाव[ ': 'नाव',
+        '७वŮ': ' ', # Seen in screenshot
+        'नाल४': ' ', # Seen in screenshot
+        'Ů': '',
+        '४': '',
+        'Ó': 'ो',
+        'Ò': 'ो',
+        'Ô': 'ो',
+        'Ö': 'ौ',
+        '×': 'ु',
     }
     for art, repl in artifacts.items():
         text = text.replace(art, repl)
+    
+    # Remove any remaining non-Marathi/ASCII characters that might be artifacts
+    text = re.sub(r'[^\u0900-\u097F\s\w]', '', text)
     return text
 
 # Global cache for PDF data
@@ -95,11 +106,13 @@ import io
 async def view_pdf(filename: str, page: int, q: str = None):
     pdf_path = os.path.join(BASE_DIR, filename)
     if not os.path.exists(pdf_path):
-        return HTMLResponse(content="File not found", status_code=404)
+        print(f"File not found: {pdf_path}")
+        return HTMLResponse(content=f"File {filename} not found on server", status_code=404)
     
+    doc = None
+    new_doc = None
     try:
         doc = fitz.open(pdf_path)
-        # Handle page bounds
         total_pages = len(doc)
         safe_page = max(1, min(page, total_pages))
         
@@ -110,33 +123,37 @@ async def view_pdf(filename: str, page: int, q: str = None):
         
         # Find and highlight the text
         if q and len(q) >= 2:
-            # Try searching for original query
-            text_instances = target_page.search_for(q)
-            
-            # If no instances found and it's Marathi, it might be due to encoding
-            # However, fitz search is usually literal. 
-            # We don't want to over-complicate this unless necessary.
-            
-            for inst in text_instances:
-                annot = target_page.add_highlight_annot(inst)
-                annot.update()
+            try:
+                # search_for can be slow or fail on some PDFs
+                text_instances = target_page.search_for(q)
+                for inst in text_instances:
+                    annot = target_page.add_highlight_annot(inst)
+                    annot.update()
+            except Exception as e:
+                print(f"Highlighting failed (skipping): {e}")
             
         # Get PDF bytes with compression
         pdf_bytes = new_doc.tobytes(garbage=3, deflate=True)
-        new_doc.close()
-        doc.close()
         
         return StreamingResponse(
             io.BytesIO(pdf_bytes), 
             media_type="application/pdf",
             headers={
                 "Content-Disposition": f"inline; filename={filename}",
-                "Cache-Control": "public, max-age=3600"
+                "Cache-Control": "public, max-age=3600",
+                "X-Total-Pages": str(total_pages)
             }
         )
     except Exception as e:
-        print(f"Error highlighting PDF: {e}")
-        return HTMLResponse(content=f"Error: {str(e)}", status_code=500)
+        print(f"Error processing PDF {filename} page {page}: {e}")
+        import traceback
+        traceback.print_exc()
+        return HTMLResponse(content=f"PDF Processing Error: {str(e)}", status_code=500)
+    finally:
+        if new_doc:
+            new_doc.close()
+        if doc:
+            doc.close()
 
 @app.on_event("startup")
 async def startup_event():
@@ -155,8 +172,24 @@ async def read_root(request: Request):
 async def search(q: str = Query(...)):
     if not q or len(q) < 2:
         return {"results": []}
+    
+    global PDF_CACHE
+    if not PDF_CACHE:
+        print("PDF_CACHE is empty, preloading...")
+        preload_pdfs()
+        
     results = search_in_pdfs(q)
     return {"results": results}
+
+@app.get("/health")
+async def health():
+    pdf_files = [f for f in os.listdir(BASE_DIR) if f.lower().endswith('.pdf')]
+    return {
+        "status": "ok",
+        "pdfs_found": pdf_files,
+        "cache_size": len(PDF_CACHE),
+        "os": os.name
+    }
 
 if __name__ == "__main__":
     import uvicorn
