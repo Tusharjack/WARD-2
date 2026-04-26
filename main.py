@@ -35,42 +35,57 @@ def normalize_text(text: str) -> str:
         text = text.replace(art, repl)
     return text
 
-def search_in_pdfs(query: str) -> List[Dict]:
-    results = []
+# Global cache for PDF data
+PDF_CACHE = []
+
+def preload_pdfs():
+    global PDF_CACHE
+    PDF_CACHE = []
     pdf_files = [f for f in os.listdir(BASE_DIR) if f.lower().endswith('.pdf')]
-    
-    # Normalize query for consistent comparison
-    clean_query = normalize_text(query.lower())
+    print(f"Preloading {len(pdf_files)} PDF(s)...")
     
     for pdf_file in pdf_files:
         pdf_path = os.path.join(BASE_DIR, pdf_file)
         try:
             doc = fitz.open(pdf_path)
+            file_data = {"filename": pdf_file, "pages": []}
             for page_num in range(len(doc)):
                 page = doc.load_page(page_num)
                 text = page.get_text()
+                lines = [line.strip() for line in text.split('\n') if line.strip()]
                 
-                # Normalize PDF text for searching
-                clean_text = normalize_text(text.lower())
-                
-                if clean_query in clean_text:
-                    lines = [line.strip() for line in text.split('\n') if line.strip()]
-                    for i, line in enumerate(lines):
-                        clean_line = normalize_text(line.lower())
-                        if clean_query in clean_line:
-                            snippet = line
-                            if i + 1 < len(lines):
-                                snippet += " " + lines[i+1]
-                            
-                            results.append({
-                                "filename": pdf_file,
-                                "page": page_num + 1,
-                                "snippets": [snippet]
-                            })
+                # Store original and normalized text for fast searching
+                page_data = {
+                    "number": page_num + 1,
+                    "original_lines": lines,
+                    "clean_text": normalize_text(text.lower()),
+                    "clean_lines": [normalize_text(line.lower()) for line in lines]
+                }
+                file_data["pages"].append(page_data)
+            PDF_CACHE.append(file_data)
             doc.close()
+            print(f"Loaded {pdf_file}")
         except Exception as e:
-            print(f"Error processing {pdf_file}: {e}")
-            
+            print(f"Error preloading {pdf_file}: {e}")
+
+def search_in_pdfs(query: str) -> List[Dict]:
+    results = []
+    clean_query = normalize_text(query.lower())
+    
+    for file_data in PDF_CACHE:
+        for page in file_data["pages"]:
+            if clean_query in page["clean_text"]:
+                for i, clean_line in enumerate(page["clean_lines"]):
+                    if clean_query in clean_line:
+                        snippet = page["original_lines"][i]
+                        if i + 1 < len(page["original_lines"]):
+                            snippet += " " + page["original_lines"][i+1]
+                        
+                        results.append({
+                            "filename": file_data["filename"],
+                            "page": page["number"],
+                            "snippets": [snippet]
+                        })
     return results
 
 from fastapi.responses import HTMLResponse, StreamingResponse
@@ -107,6 +122,10 @@ async def view_pdf(filename: str, page: int, q: str):
     except Exception as e:
         print(f"Error highlighting PDF: {e}")
         return {"error": str(e)}
+
+@app.on_event("startup")
+async def startup_event():
+    preload_pdfs()
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):

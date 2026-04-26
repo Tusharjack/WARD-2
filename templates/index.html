@@ -88,10 +88,23 @@
                 <div class="relative max-w-lg mx-auto mb-6">
                     <input type="text" id="searchInput" 
                         class="w-full px-6 py-4 rounded-full border-2 border-orange-200 focus:border-orange-500 focus:outline-none shadow-lg text-lg pr-16"
-                        placeholder="नाव किंवा ओळखपत्र क्रमांक टाका...">
+                        placeholder="नाव (उदा. शुभम) किंवा ID (उदा. AZL)...">
                     <button id="searchBtn" class="absolute right-2 top-2 bjp-orange text-white w-12 h-12 rounded-full hover:bg-orange-600 transition-colors shadow-md">
                         <i class="fas fa-search"></i>
                     </button>
+                </div>
+                
+                <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6 text-left max-w-lg mx-auto rounded-r-lg">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-info-circle text-blue-400"></i>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-blue-700">
+                                <strong>Tip for Fast Check:</strong> Search using the 10-digit ID number (e.g., <strong>AZL1234567</strong>) for instant and 100% accurate results.
+                            </p>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="flex flex-wrap justify-center gap-4 text-sm text-gray-500">
@@ -106,11 +119,11 @@
     <div id="searchInterface" class="hidden flex-1 flex flex-col lg:flex-row overflow-hidden bg-white">
         <!-- Sidebar Results -->
         <aside class="w-full lg:w-96 border-r border-gray-200 flex flex-col bg-gray-50">
-            <div class="p-4 bg-white border-b border-gray-200 flex items-center justify-between">
-                <button id="backToLanding" class="text-orange-600 hover:text-orange-700 font-semibold text-sm flex items-center gap-2">
-                    <i class="fas fa-arrow-left"></i> मागे जा
+            <div class="p-4 bg-orange-600 text-white flex items-center justify-between shadow-md">
+                <button id="backToLanding" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 transition-all">
+                    <i class="fas fa-home"></i> होम पेज
                 </button>
-                <span id="resultCount" class="text-xs font-bold text-gray-500 uppercase tracking-widest">निकाल</span>
+                <span id="resultCount" class="text-xs font-bold uppercase tracking-widest">निकाल</span>
             </div>
 
             <div id="loading" class="hidden p-12 text-center">
