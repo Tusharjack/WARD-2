@@ -166,7 +166,7 @@
             <!-- Viewer Toolbar -->
             <div id="viewerToolbar" class="p-3 bg-gray-900 text-white flex items-center justify-between border-b border-gray-700 sticky top-0 z-10">
                 <div class="flex items-center gap-2">
-                    <button onclick="showResults()" class="lg:hidden bg-orange-600 hover:bg-orange-700 px-3 py-1.5 rounded flex items-center gap-2 transition-all shadow-lg text-xs font-bold">
+                    <button onclick="goBackToResults()" class="lg:hidden bg-orange-600 hover:bg-orange-700 px-3 py-1.5 rounded flex items-center gap-2 transition-all shadow-lg text-xs font-bold">
                         <i class="fas fa-list"></i> निकालांकडे जा
                     </button>
                     <!-- Page Navigation -->
@@ -229,7 +229,7 @@
         // Initialize PDF.js
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-        async function renderPDFPage(filename, pageNum, query) {
+        async function renderPDFPage(filename, pageNum, query, isRetry = false) {
             if (!filename || !pageNum) return;
             
             pdfLoading.classList.remove('hidden');
@@ -276,10 +276,12 @@
                 console.error('Error rendering PDF:', error);
                 pdfLoading.classList.add('hidden');
                 // Only alert if it's not a cancellation
-                if (error.name !== 'RenderingCancelledException') {
+                if (error.name !== 'RenderingCancelledException' && !isRetry) {
                     console.log('Rendering failed, retrying once...');
                     // Attempt one silent retry without alert
-                    setTimeout(() => renderPDFPage(filename, pageNum, query), 500);
+                    setTimeout(() => renderPDFPage(filename, pageNum, query, true), 500);
+                } else if (error.name !== 'RenderingCancelledException') {
+                    alert('PDF दाखवताना त्रुटी आली. कृपया पुन्हा प्रयत्न करा.');
                 }
             }
         }
@@ -318,10 +320,24 @@
         window.onpopstate = function(event) {
             if (event.state) {
                 if (event.state.view === 'results') {
-                    showResults();
+                    document.querySelector('aside').classList.remove('hidden');
+                    document.getElementById('pdfViewerPanel').classList.add('hidden');
+                    document.getElementById('pdfViewerPanel').classList.remove('flex');
+                    window.scrollTo(0, 0);
+                } else if (event.state.view === 'pdf') {
+                    document.querySelector('aside').classList.add('hidden');
+                    document.getElementById('pdfViewerPanel').classList.remove('hidden');
+                    document.getElementById('pdfViewerPanel').classList.add('flex');
+                    window.scrollTo(0, 0);
                 }
             } else {
-                hideInterface();
+                landingPage.classList.remove('hidden');
+                searchInterface.classList.add('hidden');
+                document.body.classList.remove('h-screen');
+                document.querySelector('aside').classList.remove('hidden');
+                document.getElementById('pdfViewerPanel').classList.add('hidden');
+                document.getElementById('pdfViewerPanel').classList.remove('flex');
+                viewerToolbar.classList.add('hidden');
             }
         };
 
@@ -354,13 +370,9 @@
             }
         }
 
-        function showResults() {
-            document.querySelector('aside').classList.remove('hidden');
-            document.getElementById('pdfViewerPanel').classList.add('hidden');
-            document.getElementById('pdfViewerPanel').classList.remove('flex');
-            window.scrollTo(0, 0);
+        function goBackToResults() {
             if (window.innerWidth < 1024) {
-                history.pushState({view: 'results'}, '');
+                history.back();
             }
         }
 

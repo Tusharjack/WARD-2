@@ -110,10 +110,11 @@ async def view_pdf(filename: str, page: int, q: str):
         target_page = new_doc[0]
         
         # Find and highlight the text
-        text_instances = target_page.search_for(q)
-        for inst in text_instances:
-            annot = target_page.add_highlight_annot(inst)
-            annot.update()
+        if q:
+            text_instances = target_page.search_for(q)
+            for inst in text_instances:
+                annot = target_page.add_highlight_annot(inst)
+                annot.update()
             
         # Save to memory stream
         pdf_stream = io.BytesIO()
